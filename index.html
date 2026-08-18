@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Personal CRM</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f14; color: #e0e0e0; }
+
+  /* Header */
+  .header {
+    background: #16161e; border-bottom: 1px solid #2a2a3a;
+    padding: 16px 24px; display: flex; align-items: center; gap: 16px;
+    flex-wrap: wrap; position: sticky; top: 0; z-index: 50;
+  }
+  .header h1 { font-size: 20px; font-weight: 600; color: #fff; white-space: nowrap; letter-spacing: -0.3px; }
+  .search-box { flex: 1; min-width: 200px; max-width: 480px; }
+  .search-box input {
+    width: 100%; padding: 9px 14px; border: 1px solid #2a2a3a; border-radius: 8px;
+    font-size: 14px; background: #1e1e28; color: #e0e0e0; outline: none; transition: border-color 0.2s;
+  }
+  .search-box input::placeholder { color: #555; }
+  .search-box input:focus { border-color: #4f6ef7; background: #1a1a24; }
+  .header-actions { display: flex; gap: 8px; align-items: center; margin-left: auto; }
+  .btn {
+    padding: 8px 16px; border: 1px solid #2a2a3a; border-radius: 8px;
+    font-size: 13px; cursor: pointer; font-weight: 500;
+    background: #1e1e28; color: #bbb; transition: all 0.15s;
+  }
+  .btn:hover { background: #262636; color: #fff; border-color: #3a3a4a; }
+  .btn-refresh { border-color: #3b5bdb; color: #7b9cf7; }
+  .btn-refresh:hover { background: #1e2a4a; border-color: #4f6ef7; color: #a0baff; }
+  .btn-refresh.loading { opacity: 0.6; pointer-events: none; }
+  .btn-digest { border-color: #d97706; color: #fbbf24; }
+  .btn-digest:hover { background: #2a2010; border-color: #f59e0b; color: #fcd34d; }
+  .btn-auth { border-color: #16a34a; color: #4ade80; }
+  .btn-auth:hover { background: #0f2a1a; border-color: #22c55e; color: #86efac; }
+  .btn-auth.signed-in { border-color: #22c55e; color: #22c55e; }
+  .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+  .save-status { font-size: 12px; margin-left: 8px; }
+  .save-status.success { color: #22c55e; }
+  .save-status.error { color: #ef4444; }
+  .save-status.saving { color: #f59e0b; }
+
+  /* Status bar */
+  .status-bar {
+    padding: 6px 24px; font-size: 12px; color: #555;
+    background: #13131a; border-bottom: 1px solid #1e1e28;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .status-dot.ok { background: #22c55e; }
+  .status-dot.err { background: #ef4444; }
+  .status-dot.loading { background: #f59e0b; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .container { padding: 20px 24px; max-width: 100%; overflow-x: auto; }
+
+  /* Legend */
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; padding: 0 24px 16px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #666; }
+  .legend-swatch { width: 14px; height: 14px; border-radius: 3px; }
+
+  /* Sections */
+  .section { margin-bottom: 28px; }
+  .section-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+    padding-bottom: 8px; border-bottom: 1px solid #1e1e28;
+  }
+  .section-title { font-size: 15px; font-weight: 700; color: #fff; letter-spacing: -0.2px; }
+  .section-count {
+    font-size: 11px; color: #888; background: #1e1e28; padding: 2px 9px;
+    border-radius: 10px; border: 1px solid #2a2a3a; font-weight: 600;
+  }
+
+  /* Table */
+  table {
+    width: 100%; border-collapse: collapse; background: #16161e;
+    border-radius: 10px; overflow: hidden;
+    border: 1px solid #1e1e28; font-size: 13px;
+  }
+  thead th {
+    background: #1a1a24; padding: 10px 12px; text-align: left;
+    font-weight: 600; font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.5px; color: #666; border-bottom: 1px solid #2a2a3a;
+    white-space: nowrap; position: sticky; top: 0;
+  }
+  tbody td {
+    padding: 8px 12px; border-bottom: 1px solid #1a1a24;
+    vertical-align: top; max-width: 200px; line-height: 1.4;
+  }
+  tbody tr { transition: background 0.1s; cursor: pointer; }
+  tbody tr:hover { filter: brightness(1.15); }
+  tbody tr:last-child td { border-bottom: none; }
+
+  /* Urgency left border */
+  .urgency-red { border-left: 4px solid #ef4444; }
+  .urgency-orange { border-left: 4px solid #f97316; }
+  .urgency-yellow { border-left: 4px solid #eab308; }
+  .urgency-grey { border-left: 4px solid #6b7280; }
+  .urgency-green { border-left: 4px solid #22c55e; }
+  .urgency-none { border-left: 4px solid transparent; }
+
+  /* Status row colors */
+  .status-chase { background: rgba(239, 68, 68, 0.12); }
+  .status-chase td { border-bottom-color: rgba(239, 68, 68, 0.08); }
+  .status-hold { background: rgba(156, 163, 175, 0.1); }
+  .status-hold td { border-bottom-color: rgba(156, 163, 175, 0.06); }
+  .status-reachout { background: rgba(249, 115, 22, 0.12); }
+  .status-reachout td { border-bottom-color: rgba(249, 115, 22, 0.08); }
+  .status-undecided { background: rgba(234, 179, 8, 0.1); }
+  .status-undecided td { border-bottom-color: rgba(234, 179, 8, 0.06); }
+
+  /* Badges */
+  .status-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.2px; white-space: nowrap;
+  }
+  .badge-chase { background: rgba(239,68,68,0.2); color: #fca5a5; }
+  .badge-hold { background: rgba(156,163,175,0.2); color: #d1d5db; }
+  .badge-reachout { background: rgba(249,115,22,0.2); color: #fdba74; }
+  .badge-undecided { background: rgba(234,179,8,0.2); color: #fde047; }
+  .badge-overdue {
+    display: inline-block; padding: 1px 6px; border-radius: 3px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.3px;
+    background: rgba(239,68,68,0.25); color: #fca5a5; margin-left: 6px;
+  }
+  .badge-due-soon {
+    display: inline-block; padding: 1px 6px; border-radius: 3px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.3px;
+    background: rgba(245,158,11,0.25); color: #fcd34d; margin-left: 6px;
+  }
+
+  .empty-state { padding: 24px; text-align: center; color: #444; font-size: 13px; }
+  .error-msg { padding: 24px; text-align: center; color: #f87171; font-size: 14px; }
+  .cell-name { font-weight: 600; color: #fff; }
+  .cell-note { color: #999; font-size: 12px; }
+
+  /* Overlay backdrop */
+  .overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    z-index: 100; backdrop-filter: blur(2px);
+  }
+  .overlay.open { display: block; }
+
+  /* Slide-in detail panel */
+  .detail-panel {
+    position: fixed; top: 0; right: -480px; width: 460px; max-width: 90vw;
+    height: 100vh; background: #16161e; border-left: 1px solid #2a2a3a;
+    z-index: 110; transition: right 0.25s ease; overflow-y: auto;
+    display: flex; flex-direction: column;
+  }
+  .detail-panel.open { right: 0; }
+  .detail-panel-header {
+    padding: 20px 24px; border-bottom: 1px solid #2a2a3a;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .detail-panel-header h2 { font-size: 16px; color: #fff; font-weight: 600; }
+  .detail-panel-close {
+    background: none; border: none; color: #666; font-size: 22px;
+    cursor: pointer; padding: 4px 8px; border-radius: 4px;
+  }
+  .detail-panel-close:hover { color: #fff; background: #2a2a3a; }
+  .detail-panel-body { padding: 20px 24px; flex: 1; }
+  .detail-field { margin-bottom: 16px; }
+  .detail-field label {
+    display: block; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.5px; color: #666; margin-bottom: 4px; font-weight: 600;
+  }
+  .detail-field input, .detail-field textarea, .detail-field select {
+    width: 100%; padding: 8px 12px; background: #1e1e28; border: 1px solid #2a2a3a;
+    border-radius: 6px; color: #e0e0e0; font: inherit; font-size: 13px; outline: none;
+  }
+  .detail-field textarea { min-height: 60px; resize: vertical; }
+  .detail-field input:focus, .detail-field textarea:focus, .detail-field select:focus {
+    border-color: #4f6ef7;
+  }
+  .detail-panel-footer {
+    padding: 16px 24px; border-top: 1px solid #2a2a3a;
+    display: flex; gap: 10px; align-items: center;
+  }
+  .btn-save {
+    padding: 9px 20px; background: #3b5bdb; color: #fff; border: none;
+    border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .btn-save:hover { background: #4f6ef7; }
+  .btn-sheet-link {
+    padding: 9px 16px; background: transparent; border: 1px solid #2a2a3a;
+    border-radius: 8px; color: #7b9cf7; font-size: 13px; cursor: pointer;
+    text-decoration: none; display: inline-block;
+  }
+  .btn-sheet-link:hover { background: #1e2a4a; border-color: #4f6ef7; }
+
+  /* Digest modal */
+  .digest-modal {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 640px; max-width: 92vw; max-height: 80vh;
+    background: #16161e; border: 1px solid #2a2a3a; border-radius: 12px;
+    z-index: 120; display: none; flex-direction: column; overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .digest-modal.open { display: flex; }
+  .digest-header {
+    padding: 20px 24px; border-bottom: 1px solid #2a2a3a;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .digest-header h2 { font-size: 16px; color: #fff; font-weight: 600; }
+  .digest-close {
+    background: none; border: none; color: #666; font-size: 22px;
+    cursor: pointer; padding: 4px 8px; border-radius: 4px;
+  }
+  .digest-close:hover { color: #fff; background: #2a2a3a; }
+  .digest-body { padding: 16px 24px; overflow-y: auto; flex: 1; }
+  .digest-group-title {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+    color: #666; font-weight: 700; margin: 16px 0 8px; padding-bottom: 4px;
+    border-bottom: 1px solid #1e1e28;
+  }
+  .digest-group-title:first-child { margin-top: 0; }
+  .digest-item {
+    padding: 10px 12px; background: #1a1a24; border-radius: 8px;
+    margin-bottom: 6px; border-left: 3px solid transparent;
+  }
+  .digest-item.di-red { border-left-color: #ef4444; }
+  .digest-item.di-orange { border-left-color: #f97316; }
+  .digest-item.di-yellow { border-left-color: #eab308; }
+  .digest-item-name { font-weight: 600; color: #fff; font-size: 13px; }
+  .digest-item-firm { color: #888; font-size: 12px; margin-left: 6px; }
+  .digest-item-meta { font-size: 11px; color: #666; margin-top: 4px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .digest-item-note { font-size: 12px; color: #888; margin-top: 4px; font-style: italic; }
+  .digest-empty { text-align: center; color: #555; padding: 32px 0; font-size: 14px; }
+
+  @media (max-width: 768px) {
+    .container { padding: 10px; }
+    .header { padding: 12px; }
+    table { font-size: 12px; }
+    .legend { padding: 0 10px 12px; }
+    .detail-panel { width: 100vw; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Personal CRM</h1>
+  <div class="search-box">
+    <input type="text" id="search" placeholder="Search contacts..." autocomplete="off">
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-auth" id="btn-auth" onclick="handleAuth()">Sign In to Edit</button>
+    <button class="btn btn-digest" onclick="showDigest()">Today's Digest</button>
+    <button class="btn btn-refresh" id="btn-refresh" onclick="fetchSheet()">Refresh</button>
+  </div>
+</div>
+
+<div class="status-bar" id="status-bar">
+  <span class="status-dot loading" id="status-dot"></span>
+  <span id="status-text">Loading...</span>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:#ef4444"></div>Chase + Overdue</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#f97316"></div>Chase/Reach Out</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#eab308"></div>Undecided / Due Soon</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#6b7280"></div>Hold</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#22c55e"></div>Future (7+ days)</div>
+</div>
+
+<div class="container" id="app">
+  <div class="empty-state">Fetching data from Google Sheet...</div>
+</div>
+
+<!-- Detail slide-in panel -->
+<div class="overlay" id="overlay" onclick="closeDetail()"></div>
+<div class="detail-panel" id="detail-panel">
+  <div class="detail-panel-header">
+    <h2 id="detail-title">Contact</h2>
+    <button class="detail-panel-close" onclick="closeDetail()">&times;</button>
+  </div>
+  <div class="detail-panel-body" id="detail-body"></div>
+  <div class="detail-panel-footer">
+    <button class="btn-save" id="btn-save" onclick="saveDetail()">Save to Sheet</button>
+    <span class="save-status" id="save-status"></span>
+    <a class="btn-sheet-link" href="https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID" target="_blank" rel="noopener">Open in Google Sheets</a>
+  </div>
+</div>
+
+<!-- Digest modal -->
+<div class="overlay" id="digest-overlay" onclick="closeDigest()"></div>
+<div class="digest-modal" id="digest-modal">
+  <div class="digest-header">
+    <h2 id="digest-title">Daily Digest</h2>
+    <button class="digest-close" onclick="closeDigest()">&times;</button>
+  </div>
+  <div class="digest-body" id="digest-body"></div>
+</div>
+
+<script>
+const SHEET_ID = 'YOUR_GOOGLE_SHEET_ID'; // See README for setup instructions
+const API_KEY = 'YOUR_GOOGLE_SHEETS_API_KEY'; // See README for setup instructions
+const RANGE = "'To Dos 2026'!A:M";
+const TAB_NAME = 'To Dos 2026';
+
+// ── OAuth 2.0 ──
+// Create credentials at https://console.cloud.google.com/apis/credentials
+// Type: OAuth 2.0 Client ID → Web application
+// Authorized JS origins: add http://localhost and file:// or wherever you serve this
+const OAUTH_CLIENT_ID = ''; // Paste your Client ID here
+const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
+let accessToken = null;
+let tokenClient = null;
+
+const SECTION_NAMES = ['Personal', 'Recent HHs', 'Reach out in x Months', 'Fresher Leads', 'To Resuscitate', 'To Watch'];
+const COL_KEYS = ['name','firm','position','location','contactQuality','status','plan','contactNote','motive','reachedOut','result','nextDate','notes'];
+const COL_LABELS = ['Name','Firm','Position in Firm','Location','Contact Quality','Status','Plan','Contact/Status Note','Motive','Reached Out','Result of Reachouts','Next Date','Notes'];
+
+const STATUS_ROW_CLASS = { 'chase':'status-chase', 'hold':'status-hold', 'reach out':'status-reachout', 'contact undecided':'status-undecided' };
+const STATUS_BADGE_CLASS = { 'chase':'badge-chase', 'hold':'badge-hold', 'reach out':'badge-reachout', 'contact undecided':'badge-undecided' };
+
+let sections = {};
+let sectionOrder = [];
+let lastFetch = null;
+let editingContact = null; // { section, index }
+
+// ── Date helpers ──
+function today() {
+  const d = new Date(); d.setHours(0,0,0,0); return d;
+}
+function parseDate(str) {
+  if (!str) return null;
+  // Try various formats
+  let d = new Date(str);
+  if (!isNaN(d)) { d.setHours(0,0,0,0); return d; }
+  // Try DD/MM/YYYY
+  const parts = str.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+  if (parts) {
+    let y = parseInt(parts[3]); if (y < 100) y += 2000;
+    d = new Date(y, parseInt(parts[2]) - 1, parseInt(parts[1]));
+    if (!isNaN(d)) { d.setHours(0,0,0,0); return d; }
+    // Try MM/DD/YYYY
+    d = new Date(y, parseInt(parts[1]) - 1, parseInt(parts[2]));
+    if (!isNaN(d)) { d.setHours(0,0,0,0); return d; }
+  }
+  return null;
+}
+function daysDiff(date) {
+  if (!date) return null;
+  const t = today();
+  return Math.round((date - t) / 86400000);
+}
+function isOverdue(contact) { const diff = daysDiff(parseDate(contact.nextDate)); return diff !== null && diff < 0; }
+function isDueSoon(contact) { const diff = daysDiff(parseDate(contact.nextDate)); return diff !== null && diff >= 0 && diff <= 3; }
+function isToday(contact) { const diff = daysDiff(parseDate(contact.nextDate)); return diff === 0; }
+function isFuture7(contact) { const diff = daysDiff(parseDate(contact.nextDate)); return diff !== null && diff > 7; }
+function getStatusKey(status) { return (status || '').trim().toLowerCase(); }
+
+// ── Urgency class ──
+function urgencyClass(contact) {
+  const sk = getStatusKey(contact.status);
+  const overdue = isOverdue(contact);
+  const dueSoon = isDueSoon(contact);
+  if (sk === 'chase' && overdue) return 'urgency-red';
+  if ((sk === 'chase' && dueSoon) || sk === 'reach out') return 'urgency-orange';
+  if (sk === 'contact undecided' || dueSoon) return 'urgency-yellow';
+  if (sk === 'hold') return 'urgency-grey';
+  if (isFuture7(contact)) return 'urgency-green';
+  return 'urgency-none';
+}
+
+// ── Parsing ──
+function isSectionHeader(row) {
+  if (!row || row.length < 2) return null;
+  const colB = (row[1] || '').trim();
+  if (!colB) return null;
+  const restEmpty = row.slice(2).every(c => !(c || '').trim());
+  if (!restEmpty) return null;
+  const match = SECTION_NAMES.find(s => s.toLowerCase() === colB.toLowerCase());
+  return match || colB;
+}
+function isHeaderRow(row) {
+  if (!row || row.length < 4) return false;
+  const colC = (row[2] || '').trim().toLowerCase();
+  return colC === 'name' || colC === 'names' || colC === 'task';
+}
+function isEmpty(row) { return !row || row.every(c => !(c || '').trim()); }
+
+function parseRows(rows) {
+  sections = {};
+  sectionOrder = [];
+  let currentSection = null;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (isEmpty(row)) continue;
+    if (isHeaderRow(row)) continue;
+    const sec = isSectionHeader(row);
+    if (sec) {
+      currentSection = sec;
+      if (!sections[sec]) { sections[sec] = []; sectionOrder.push(sec); }
+      continue;
+    }
+    if (!currentSection) continue;
+    const contact = { _row: i + 1 }; // 1-indexed sheet row number
+    COL_KEYS.forEach((key, idx) => { contact[key] = (row[idx + 2] || '').trim(); });
+    if (!contact.name) continue;
+    sections[currentSection].push(contact);
+  }
+}
+
+// ── API ──
+function setStatus(state, msg) {
+  document.getElementById('status-dot').className = 'status-dot ' + state;
+  document.getElementById('status-text').textContent = msg;
+}
+
+async function fetchSheet() {
+  const btn = document.getElementById('btn-refresh');
+  btn.classList.add('loading'); btn.textContent = 'Loading...';
+  setStatus('loading', 'Fetching from Google Sheets...');
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(RANGE).replace(/%27/g, "'")}?key=${API_KEY}`;
+    const res = await fetch(url);
+    if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error?.message || `HTTP ${res.status}`); }
+    const json = await res.json();
+    parseRows(json.values || []);
+    lastFetch = new Date();
+    const total = Object.values(sections).reduce((s, a) => s + a.length, 0);
+    setStatus('ok', `${total} contacts loaded — ${lastFetch.toLocaleTimeString()}`);
+    render();
+  } catch (err) {
+    setStatus('err', 'Error: ' + err.message);
+    document.getElementById('app').innerHTML = `<div class="error-msg">Failed to load sheet data.<br>${esc(err.message)}</div>`;
+  } finally {
+    btn.classList.remove('loading'); btn.textContent = 'Refresh';
+  }
+}
+
+function esc(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+
+// ── Render ──
+function render() {
+  const app = document.getElementById('app');
+  const searchTerm = (document.getElementById('search').value || '').toLowerCase();
+  let html = '';
+
+  sectionOrder.forEach(sectionName => {
+    const contacts = sections[sectionName] || [];
+    const filtered = contacts.filter(c => {
+      if (!searchTerm) return true;
+      return COL_KEYS.some(k => (c[k] || '').toLowerCase().includes(searchTerm));
+    });
+
+    html += `<div class="section">
+      <div class="section-header">
+        <span class="section-title">${esc(sectionName)}</span>
+        <span class="section-count">${filtered.length}</span>
+      </div>`;
+
+    if (filtered.length === 0) {
+      html += `<div class="empty-state">${searchTerm ? 'No matches.' : 'No contacts in this section.'}</div>`;
+    } else {
+      html += `<table><thead><tr><th style="width:4px"></th>`;
+      COL_LABELS.forEach(label => { html += `<th>${esc(label)}</th>`; });
+      html += `</tr></thead><tbody>`;
+
+      filtered.forEach((contact, fi) => {
+        // find real index in section array
+        const realIdx = contacts.indexOf(contact);
+        const sk = getStatusKey(contact.status);
+        const rowCls = STATUS_ROW_CLASS[sk] || '';
+        const urg = urgencyClass(contact);
+        const overdue = isOverdue(contact);
+        const dueSoon = isDueSoon(contact);
+
+        html += `<tr class="${rowCls} ${urg}" onclick="openDetail('${esc(sectionName)}',${realIdx})">`;
+        html += `<td style="padding:0;width:0"></td>`; // urgency border is on the tr
+
+        COL_KEYS.forEach(key => {
+          const val = contact[key] || '';
+          if (key === 'name') {
+            let badges = '';
+            if (overdue) badges += '<span class="badge-overdue">OVERDUE</span>';
+            else if (dueSoon) badges += '<span class="badge-due-soon">DUE SOON</span>';
+            html += `<td class="cell-name">${esc(val)}${badges}</td>`;
+          } else if (key === 'status' && val) {
+            const badgeCls = STATUS_BADGE_CLASS[sk] || '';
+            html += `<td><span class="status-badge ${badgeCls}">${esc(val)}</span></td>`;
+          } else if (['notes','contactNote','plan','result'].includes(key)) {
+            html += `<td class="cell-note">${esc(val)}</td>`;
+          } else {
+            html += `<td>${esc(val)}</td>`;
+          }
+        });
+        html += `</tr>`;
+      });
+      html += `</tbody></table>`;
+    }
+    html += `</div>`;
+  });
+
+  app.innerHTML = html;
+}
+
+// ── Detail panel ──
+function openDetail(sectionName, index) {
+  const contact = sections[sectionName][index];
+  if (!contact) return;
+  editingContact = { section: sectionName, index };
+  document.getElementById('detail-title').textContent = contact.name || 'Contact';
+  const body = document.getElementById('detail-body');
+  let html = '';
+  COL_KEYS.forEach((key, i) => {
+    const label = COL_LABELS[i];
+    const val = (contact[key] || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    html += `<div class="detail-field"><label>${esc(label)}</label>`;
+    if (key === 'status') {
+      html += `<select id="detail-${key}">`;
+      ['', 'Chase', 'Hold', 'Reach Out', 'Contact Undecided'].forEach(opt => {
+        html += `<option value="${opt}"${contact[key] === opt ? ' selected' : ''}>${opt || '—'}</option>`;
+      });
+      html += `</select>`;
+    } else if (key === 'nextDate') {
+      // Attempt to format for date input
+      const d = parseDate(contact[key]);
+      const iso = d ? d.toISOString().slice(0, 10) : val;
+      html += `<input type="date" id="detail-${key}" value="${iso}">`;
+    } else if (['plan','contactNote','motive','result','notes'].includes(key)) {
+      html += `<textarea id="detail-${key}">${val}</textarea>`;
+    } else {
+      html += `<input type="text" id="detail-${key}" value="${val}">`;
+    }
+    html += `</div>`;
+  });
+  body.innerHTML = html;
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('detail-panel').classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('overlay').classList.remove('open');
+  document.getElementById('detail-panel').classList.remove('open');
+  editingContact = null;
+}
+
+async function saveDetail() {
+  if (!editingContact) return;
+  const contact = sections[editingContact.section][editingContact.index];
+  const statusEl = document.getElementById('save-status');
+  const saveBtn = document.getElementById('btn-save');
+
+  // Collect new values
+  const newValues = {};
+  COL_KEYS.forEach(key => {
+    const el = document.getElementById('detail-' + key);
+    if (el) newValues[key] = el.value;
+  });
+
+  // Write to Google Sheets if signed in
+  if (accessToken && contact._row) {
+    saveBtn.disabled = true;
+    statusEl.className = 'save-status saving';
+    statusEl.textContent = 'Saving to sheet...';
+
+    try {
+      // Build the row values: cols A and B stay empty (original), C onwards are our fields
+      const rowData = ['', '', ...COL_KEYS.map(k => newValues[k] || '')];
+      const rowNum = contact._row;
+      const range = `'${TAB_NAME}'!A${rowNum}:O${rowNum}`;
+
+      const res = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': 'Bearer ' + accessToken,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ range, majorDimension: 'ROWS', values: [rowData] }),
+        }
+      );
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message || `HTTP ${res.status}`);
+      }
+
+      statusEl.className = 'save-status success';
+      statusEl.textContent = 'Saved!';
+      setTimeout(() => { statusEl.textContent = ''; }, 2500);
+    } catch (err) {
+      statusEl.className = 'save-status error';
+      statusEl.textContent = 'Error: ' + err.message;
+      saveBtn.disabled = false;
+      return; // Don't close panel on error
+    }
+    saveBtn.disabled = false;
+  } else if (!accessToken) {
+    statusEl.className = 'save-status error';
+    statusEl.textContent = 'Sign in first to save to sheet';
+    // Still update locally
+  }
+
+  // Update local data
+  COL_KEYS.forEach(key => { contact[key] = newValues[key] || ''; });
+  render();
+  closeDetail();
+}
+
+// Close panel on Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeDetail(); closeDigest(); }
+});
+
+// ── Digest ──
+function showDigest() {
+  const todayStr = today().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  document.getElementById('digest-title').textContent = `Daily Digest — ${todayStr}`;
+
+  // Collect all contacts with urgency
+  const all = [];
+  sectionOrder.forEach(sec => {
+    (sections[sec] || []).forEach(c => {
+      const sk = getStatusKey(c.status);
+      const overdue = isOverdue(c);
+      const dueSoon = isDueSoon(c);
+      const tod = isToday(c);
+      let priority = 99;
+      let group = '';
+      if (overdue && sk === 'chase') { priority = 0; group = 'Overdue — Chase'; }
+      else if (overdue) { priority = 1; group = 'Overdue'; }
+      else if (dueSoon) { priority = 2; group = 'Due Soon (next 3 days)'; }
+      else if (tod) { priority = 3; group = 'Due Today'; }
+      if (priority < 99) all.push({ ...c, _priority: priority, _group: group, _section: sec });
+    });
+  });
+
+  all.sort((a, b) => a._priority - b._priority);
+
+  const body = document.getElementById('digest-body');
+  if (all.length === 0) {
+    body.innerHTML = '<div class="digest-empty">Nothing urgent today. You\'re all caught up.</div>';
+  } else {
+    let html = '';
+    let lastGroup = '';
+    all.forEach(c => {
+      if (c._group !== lastGroup) {
+        lastGroup = c._group;
+        html += `<div class="digest-group-title">${esc(lastGroup)}</div>`;
+      }
+      const colorCls = c._priority === 0 ? 'di-red' : c._priority === 1 ? 'di-orange' : c._priority === 2 ? 'di-yellow' : '';
+      html += `<div class="digest-item ${colorCls}">
+        <div><span class="digest-item-name">${esc(c.name)}</span><span class="digest-item-firm">${esc(c.firm)}</span></div>
+        <div class="digest-item-meta">
+          <span>Status: ${esc(c.status || '—')}</span>
+          <span>Next Date: ${esc(c.nextDate || '—')}</span>
+          <span>Section: ${esc(c._section)}</span>
+        </div>
+        ${c.contactNote ? `<div class="digest-item-note">${esc(c.contactNote)}</div>` : ''}
+      </div>`;
+    });
+    body.innerHTML = html;
+  }
+
+  document.getElementById('digest-overlay').classList.add('open');
+  document.getElementById('digest-modal').classList.add('open');
+}
+
+function closeDigest() {
+  document.getElementById('digest-overlay').classList.remove('open');
+  document.getElementById('digest-modal').classList.remove('open');
+}
+
+// ── OAuth ──
+function initOAuth() {
+  if (!OAUTH_CLIENT_ID) {
+    console.warn('No OAUTH_CLIENT_ID set — edit mode disabled. Set it at the top of the script.');
+    document.getElementById('btn-auth').title = 'Set OAUTH_CLIENT_ID in the HTML to enable';
+    return;
+  }
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: OAUTH_CLIENT_ID,
+    scope: SCOPES,
+    callback: (response) => {
+      if (response.error) {
+        console.error('OAuth error:', response);
+        return;
+      }
+      accessToken = response.access_token;
+      const btn = document.getElementById('btn-auth');
+      btn.textContent = 'Signed In';
+      btn.classList.add('signed-in');
+      // Token expires — schedule refresh
+      setTimeout(() => {
+        accessToken = null;
+        btn.textContent = 'Sign In to Edit';
+        btn.classList.remove('signed-in');
+      }, (response.expires_in - 60) * 1000);
+    },
+  });
+}
+
+function handleAuth() {
+  if (!OAUTH_CLIENT_ID) {
+    alert('OAuth Client ID not configured.\n\n1. Go to https://console.cloud.google.com/apis/credentials\n2. Create an OAuth 2.0 Client ID (Web application)\n3. Add your origin to Authorized JavaScript Origins\n4. Paste the Client ID into OAUTH_CLIENT_ID in the HTML file.');
+    return;
+  }
+  if (accessToken) return; // already signed in
+  tokenClient.requestAccessToken({ prompt: 'consent' });
+}
+
+// Wait for GIS library to load, then init
+function waitForGIS() {
+  if (typeof google !== 'undefined' && google.accounts) {
+    initOAuth();
+  } else {
+    setTimeout(waitForGIS, 200);
+  }
+}
+
+// ── Init ──
+document.getElementById('search').addEventListener('input', render);
+fetchSheet();
+waitForGIS();
+</script>
+</body>
+</html>

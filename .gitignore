@@ -1,0 +1,28 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+
+# Dependencies
+node_modules/
+
+# Real contact data — never publish
+linkedin-import-b64.txt
+linkedin-import-for-sheet.csv
+linkedin-import-for-sheet.tsv
+linkedin-new-contacts.csv
+linkedin-new-since-dec2023.csv
+
+# Test artifacts (may contain real data in screenshots)
+test-results/
+tests/screenshots/
