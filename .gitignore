@@ -26,3 +26,4 @@ linkedin-new-since-dec2023.csv
 # Test artifacts (may contain real data in screenshots)
 test-results/
 tests/screenshots/
+config.local.js

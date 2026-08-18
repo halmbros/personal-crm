@@ -283,7 +283,7 @@
   <div class="detail-panel-footer">
     <button class="btn-save" id="btn-save" onclick="saveDetail()">Save to Sheet</button>
     <span class="save-status" id="save-status"></span>
-    <a class="btn-sheet-link" href="https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID" target="_blank" rel="noopener">Open in Google Sheets</a>
+    <a class="btn-sheet-link" id="sheetLink" href="#" target="_blank" rel="noopener">Open in Google Sheets</a>
   </div>
 </div>
 
@@ -296,10 +296,14 @@
   </div>
   <div class="digest-body" id="digest-body"></div>
 </div>
-
+<script src="config.local.js"></script>
 <script>
-const SHEET_ID = 'YOUR_GOOGLE_SHEET_ID'; // See README for setup instructions
-const API_KEY = 'YOUR_GOOGLE_SHEETS_API_KEY'; // See README for setup instructions
+const SHEET_ID = (window.CRM_CONFIG && window.CRM_CONFIG.SHEET_ID) || 'YOUR_GOOGLE_SHEET_ID'; // See README for setup instructions
+const API_KEY = (window.CRM_CONFIG && window.CRM_CONFIG.API_KEY) || 'YOUR_GOOGLE_SHEETS_API_KEY'; // See README for setup instructions
+document.addEventListener('DOMContentLoaded', function(){
+  var sl = document.getElementById('sheetLink');
+  if (sl && SHEET_ID !== 'YOUR_GOOGLE_SHEET_ID') sl.href = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID;
+});
 const RANGE = "'To Dos 2026'!A:M";
 const TAB_NAME = 'To Dos 2026';
 
